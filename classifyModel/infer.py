@@ -1,9 +1,10 @@
+import argparse
+import json
+from pathlib import Path
+
 import torch
 import pandas as pd
 import numpy as np
-import json
-import argparse
-from pathlib import Path
 
 import config
 from utils import getDevice, logitTransform
@@ -12,10 +13,10 @@ from model import CancerClassifier
 def loadArtifacts():
     print("Loading trained model and preprocessing parameters...")
 
-    with open(config.getArtifactPath('label_encoder'), 'r') as f:
+    with open(config.getArtifactPath('label_encoder'), 'r', encoding = 'utf-8') as f:
         labelEncoder = json.load(f)
 
-    with open(config.getArtifactPath('probe_names'), 'r') as f:
+    with open(config.getArtifactPath('probe_names'), 'r', encoding = 'utf-8') as f:
         probeNames = json.load(f)
 
     imputeMedians = torch.load(config.getArtifactPath('impute_medians')).numpy()
@@ -58,8 +59,8 @@ def preprocessSample(sampleData, probeNames, imputeMedians, featureMean, feature
         else:
             features[i] = np.nan
 
-    for i in range(len(features)):
-        if np.isnan(features[i]):
+    for i, feature in enumerate(features):
+        if np.isnan(feature):
             features[i] = imputeMedians[i]
 
     features = np.clip(features, config.BETA_CLIP_MIN, config.BETA_CLIP_MAX)
