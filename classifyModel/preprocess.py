@@ -30,8 +30,8 @@ def downloadManifests():
                 with open(tsvPath, 'wb') as fOut:
                     shutil.copyfileobj(fIn, fOut)
 
-            manifest = pd.read_csv(tsvPath, sep='\t', usecols=['probeID', 'chrm'])
-            sexProbes = manifest[manifest['chrm'].isin(['chrX', 'chrY'])]['probeID'].tolist()
+            manifest = pd.read_csv(tsvPath, sep='\t', usecols=['Probe_ID', 'CpG_chrm'])
+            sexProbes = manifest[manifest['CpG_chrm'].isin(['chrX', 'chrY'])]['Probe_ID'].tolist()
             sexChrProbes.update(sexProbes)
             print(f"  Found {len(sexProbes)} sex chromosome probes in {name}")
 
@@ -53,7 +53,7 @@ def loadCDR():
 def filterSamples(methylationHeader, cdr):
     print("Filtering samples...")
 
-    sampleBarcodes = methylationHeader[1:]
+    sampleBarcodes = [col.strip('"') for col in methylationHeader[1:]]
 
     primaryTumors = []
     patientMap = {}
@@ -76,16 +76,18 @@ def filterSamples(methylationHeader, cdr):
 def loadMethylationData(keptSamples):
     print("Loading methylation data...")
 
-    useCols = ['Composite Element REF'] + keptSamples
+    useCols = ['"Composite Element REF"'] + [f'"{sample}"' for sample in keptSamples]
 
     methylation = pd.read_csv(
         config.METHYLATION_FILE,
         sep='\t',
         usecols=useCols,
-        dtype={col: 'float32' for col in keptSamples},
+        dtype={f'"{col}"': 'float32' for col in keptSamples},
         low_memory=False
     )
 
+    methylation = methylation.rename(columns={'"Composite Element REF"': 'Composite Element REF'})
+    methylation.columns = [col.strip('"') for col in methylation.columns]
     methylation = methylation.set_index('Composite Element REF')
     methylation = methylation.T
 
@@ -262,7 +264,7 @@ def main():
 
     trainLabels = artifacts['train_labels'].numpy()
     for label, count in sorted(pd.Series(trainLabels).value_counts().items()):
-        cancerType = meta['cancer_types'][str(label)]
+        cancerType = meta['cancer_types'][label]
         print(f"  {cancerType}: {count}")
 
 if __name__ == '__main__':
