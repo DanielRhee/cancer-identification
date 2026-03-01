@@ -107,14 +107,10 @@ def filterProbes(methylation):
         print("  Skipping sex chromosome filtering (no manifests available)")
 
     missingnessRate = methylation.isnull().sum() / len(methylation)
+    missingnessRate = methylation.isnull().sum() / len(methylation)
     keptProbes = missingnessRate[missingnessRate <= config.MISSINGNESS_THRESHOLD].index
     methylation = methylation[keptProbes]
     print(f"  Removed {len(missingnessRate) - len(keptProbes)} probes with >{config.MISSINGNESS_THRESHOLD*100}% missingness")
-
-    probeVariances = methylation.var()
-    topProbes = probeVariances.nlargest(config.NUM_PROBES).index
-    methylation = methylation[topProbes]
-    print(f"  Selected top {config.NUM_PROBES} most variable probes")
 
     return methylation
 
@@ -158,6 +154,16 @@ def preprocessData(methylation, cdr, patientMap):
     valFeatures, valLabels = features[valIdx], labels[valIdx]
     testFeatures, testLabels = features[testIdx], labels[testIdx]
 
+    trainVariances = np.var(trainFeatures, axis=0)
+    topIndices = np.argsort(trainVariances)[-config.NUM_PROBES:]
+    
+    trainFeatures = trainFeatures[:, topIndices]
+    valFeatures = valFeatures[:, topIndices]
+    testFeatures = testFeatures[:, topIndices]
+    
+    probeNames = np.array(data.drop(columns=['cancer_type', 'label']).columns)[topIndices].tolist()
+    print(f"  Selected top {config.NUM_PROBES} most variable probes based on training set")
+
     imputeMedians = np.nanmedian(trainFeatures, axis=0)
 
     for i in range(trainFeatures.shape[1]):
@@ -193,7 +199,7 @@ def preprocessData(methylation, cdr, patientMap):
         'val_labels': torch.tensor(valLabels, dtype=torch.long),
         'test_labels': torch.tensor(testLabels, dtype=torch.long),
         'label_encoder': labelEncoder,
-        'probe_names': data.drop(columns=['cancer_type', 'label']).columns.tolist(),
+        'probe_names': probeNames,
         'impute_medians': torch.tensor(imputeMedians, dtype=torch.float32),
         'feature_mean': torch.tensor(featureMean, dtype=torch.float32),
         'feature_std': torch.tensor(featureStd, dtype=torch.float32),

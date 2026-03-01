@@ -43,7 +43,7 @@ def getLinearWarmupCosineSchedule(optimizer, warmupSteps, totalSteps):
 
     return torch.optim.lr_scheduler.LambdaLR(optimizer, lrLambda)
 
-def trainEpoch(model, dataLoader, criterion, optimizer, device):
+def trainEpoch(model, dataLoader, criterion, optimizer, scheduler, device):
     model.train()
     totalLoss = 0
     allPreds = []
@@ -57,6 +57,7 @@ def trainEpoch(model, dataLoader, criterion, optimizer, device):
         loss = criterion(outputs, labels)
         loss.backward()
         optimizer.step()
+        scheduler.step()
 
         totalLoss += loss.item()
         preds = outputs.argmax(dim=1)
@@ -159,10 +160,7 @@ def train():
         print(f"\nEpoch {epoch + 1}/{config.NUM_EPOCHS}")
         print("-" * 60)
 
-        trainLoss, trainAcc, trainF1 = trainEpoch(model, trainLoader, criterion, optimizer, device)
-
-        for _ in range(stepsPerEpoch):
-            scheduler.step()
+        trainLoss, trainAcc, trainF1 = trainEpoch(model, trainLoader, criterion, optimizer, scheduler, device)
 
         valLoss, valAcc, valF1, _, _ = evaluateModel(model, valLoader, criterion, device)
 
