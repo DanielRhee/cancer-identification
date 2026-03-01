@@ -1,3 +1,5 @@
+import json
+
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
@@ -5,8 +7,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import classification_report, confusion_matrix, f1_score, accuracy_score
-from tqdm import tqdm
-import json
 
 import config
 from utils import getDevice
@@ -120,7 +120,7 @@ def train():
 
     trainLoader, valLoader, testLoader = createDataLoaders()
 
-    with open(config.getArtifactPath('label_encoder'), 'r') as f:
+    with open(config.getArtifactPath('label_encoder'), 'r', encoding = 'utf-8') as f:
         labelEncoder = json.load(f)
 
     classWeights = torch.load(config.getArtifactPath('class_weights'), weights_only=False).to(device)
@@ -128,7 +128,7 @@ def train():
     inputDim = trainLoader.dataset.features.shape[1]
     numClasses = len(labelEncoder)
 
-    print(f"\nModel configuration:")
+    print("\nModel configuration:")
     print(f"  Input dimension: {inputDim}")
     print(f"  Hidden dimensions: {config.HIDDEN_DIMS}")
     print(f"  Number of classes: {numClasses}")
@@ -203,7 +203,7 @@ def train():
 
     testLoss, testAcc, testF1, testPreds, testLabels = evaluateModel(model, testLoader, criterion, device)
 
-    print(f"\nTest Set Results:")
+    print("\nTest Set Results:")
     print(f"  Loss: {testLoss:.4f}")
     print(f"  Accuracy: {testAcc:.4f}")
     print(f"  Macro-F1: {testF1:.4f}")

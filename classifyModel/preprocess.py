@@ -1,13 +1,12 @@
+import json
+import shutil
+
 import pandas as pd
 import numpy as np
 import torch
-import json
-from pathlib import Path
 from sklearn.model_selection import train_test_split
-from tqdm import tqdm
 import urllib.request
 import gzip
-import shutil
 
 import config
 from utils import logitTransform
@@ -156,11 +155,11 @@ def preprocessData(methylation, cdr, patientMap):
 
     trainVariances = np.var(trainFeatures, axis=0)
     topIndices = np.argsort(trainVariances)[-config.NUM_PROBES:]
-    
+
     trainFeatures = trainFeatures[:, topIndices]
     valFeatures = valFeatures[:, topIndices]
     testFeatures = testFeatures[:, topIndices]
-    
+
     probeNames = np.array(data.drop(columns=['cancer_type', 'label']).columns)[topIndices].tolist()
     print(f"  Selected top {config.NUM_PROBES} most variable probes based on training set")
 
@@ -214,10 +213,10 @@ def saveArtifacts(artifacts):
                 'test_labels', 'impute_medians', 'feature_mean', 'feature_std', 'class_weights']:
         torch.save(artifacts[key], config.getArtifactPath(key))
 
-    with open(config.getArtifactPath('label_encoder'), 'w') as f:
+    with open(config.getArtifactPath('label_encoder'), 'w', encoding = 'utf-8') as f:
         json.dump(artifacts['label_encoder'], f, indent=2)
 
-    with open(config.getArtifactPath('probe_names'), 'w') as f:
+    with open(config.getArtifactPath('probe_names'), 'w', encoding = 'utf-8') as f:
         json.dump(artifacts['probe_names'], f, indent=2)
 
     meta = {
@@ -231,7 +230,7 @@ def saveArtifacts(artifacts):
         'cancer_types': {v: k for k, v in artifacts['label_encoder'].items()}
     }
 
-    with open(config.getArtifactPath('preprocess_meta'), 'w') as f:
+    with open(config.getArtifactPath('preprocess_meta'), 'w', encoding = 'utf-8') as f:
         json.dump(meta, f, indent=2)
 
     print("  All artifacts saved successfully")
@@ -245,7 +244,7 @@ def main():
     cdr = loadCDR()
 
     print("Reading methylation file header...")
-    with open(config.METHYLATION_FILE, 'r') as f:
+    with open(config.METHYLATION_FILE, 'r', encoding = 'utf-8') as f:
         header = f.readline().strip().split('\t')
 
     keptSamples, patientMap = filterSamples(header, cdr)
