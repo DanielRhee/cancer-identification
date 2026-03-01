@@ -1,0 +1,43 @@
+{
+  "num_samples": {
+    "train": 7120,
+    "val": 1526,
+    "test": 1526
+  },
+  "num_features": 5000,
+  "num_classes": 32,
+  "cancer_types": {
+    "0": "ACC",
+    "1": "BLCA",
+    "2": "BRCA",
+    "3": "CESC",
+    "4": "CHOL",
+    "5": "COAD",
+    "6": "DLBC",
+    "7": "ESCA",
+    "8": "GBM",
+    "9": "HNSC",
+    "10": "KICH",
+    "11": "KIRC",
+    "12": "KIRP",
+    "13": "LGG",
+    "14": "LIHC",
+    "15": "LUAD",
+    "16": "LUSC",
+    "17": "MESO",
+    "18": "OV",
+    "19": "PAAD",
+    "20": "PCPG",
+    "21": "PRAD",
+    "22": "READ",
+    "23": "SARC",
+    "24": "SKCM",
+    "25": "STAD",
+    "26": "TGCT",
+    "27": "THCA",
+    "28": "THYM",
+    "29": "UCEC",
+    "30": "UCS",
+    "31": "UVM"
+  }
+}
