@@ -28,22 +28,11 @@ from drugability import config as drugConfig
 from drugability.model import ExpressionTranslator, DrugPredictor
 
 def loadAllModels():
-    """Load all three models and preprocessing artifacts."""
-    print("=" * 80)
-    print("Loading Cancer Drug Sensitivity Prediction Pipeline")
-    print("=" * 80)
-    print()
+    print("Program start")
 
     device = getDevice()
-    print(f"Using device: {device}")
-    print()
-
-    print("Loading Model 1: Cancer Type Classifier...")
     classifyModel, probeNames, imputeMedians, featureMean, featureStd, cancerTypeEncoder, _ = classifyInfer.loadArtifacts()
     classifyModel = classifyModel.to(device)
-    print("  ✓ Loaded")
-
-    print("Loading Model 2: Expression Translator...")
     with open(drugConfig.getArtifactPath('gene_overlap'), 'r') as f:
         geneOverlap = json.load(f)
 
@@ -59,9 +48,6 @@ def loadAllModels():
 
     translatorModel.load_state_dict(torch.load(drugConfig.getArtifactPath('translator_best_model'), map_location=device, weights_only=True))
     translatorModel.eval()
-    print("  ✓ Loaded")
-
-    print("Loading Model 3: Drug Predictor...")
     with open(drugConfig.getArtifactPath('drug_names'), 'r') as f:
         drugNames = json.load(f)
 
@@ -74,10 +60,8 @@ def loadAllModels():
 
     predictorModel.load_state_dict(torch.load(drugConfig.getArtifactPath('predictor_best_model'), map_location=device, weights_only=True))
     predictorModel.eval()
-    print("  ✓ Loaded")
+    print("Loaded Models ")
 
-    print()
-    print("Loading metadata...")
     with open(drugConfig.getArtifactPath('cancer_type_drug_map'), 'r') as f:
         cancerTypeDrugMap = json.load(f)
 
@@ -89,14 +73,6 @@ def loadAllModels():
         print("  Warning: perDrugReliability.json not found, using default scores")
         perDrugReliability = {drug: 0.5 for drug in drugNames}
 
-    print("  ✓ Loaded")
-    print()
-    print(f"Pipeline ready!")
-    print(f"  - {len(geneOverlap)} genes")
-    print(f"  - {len(drugNames)} drugs")
-    print(f"  - {len(cancerTypeEncoder)} cancer types")
-    print()
-
     return {
         'classify_model': classifyModel,
         'translator_model': translatorModel,
@@ -105,6 +81,7 @@ def loadAllModels():
         'impute_medians': imputeMedians,
         'feature_mean': featureMean,
         'feature_std': featureStd,
+
         'expression_mean': expressionMean,
         'expression_std': expressionStd,
         'cancer_type_encoder': cancerTypeEncoder,
@@ -136,8 +113,8 @@ def loadExampleSample():
 
     sampleDf = pd.Series(sampleData, index=probeNames)
 
-    print(f"  Selected test sample {idx}")
-    print(f"  True cancer type: {trueLabel}")
+    print("  Selected test sample: " + str(idx))
+    print("  True cancer type: " + trueLabel)
     print()
 
     return sampleDf, trueLabel
@@ -145,13 +122,10 @@ def loadExampleSample():
 def predictFromMethylation(methylationData, artifacts, topK=10, showAll=False):
     """Run full 3-model pipeline on methylation data."""
     device = artifacts['device']
-
-    print("=" * 80)
+    
     print("RUNNING PREDICTION PIPELINE")
-    print("=" * 80)
-    print()
 
-    print("[Step 1/4] Preprocessing methylation data...")
+    print("Preprocessing methylation data")
     processedMethylation = classifyInfer.preprocessSample(
         methylationData,
         artifacts['probe_names'],
@@ -160,10 +134,8 @@ def predictFromMethylation(methylationData, artifacts, topK=10, showAll=False):
         artifacts['feature_std']
     )
     methylationTensor = torch.tensor(processedMethylation, dtype=torch.float32).unsqueeze(0).to(device)
-    print("  ✓ Preprocessed 5000 methylation probes")
-    print()
 
-    print("[Step 2/4] Predicting cancer type (Model 1)...")
+    print(" Predicting cancer type")
     with torch.no_grad():
         cancerLogits = artifacts['classify_model'](methylationTensor)
         cancerProbs = torch.softmax(cancerLogits, dim=1)
@@ -173,41 +145,34 @@ def predictFromMethylation(methylationData, artifacts, topK=10, showAll=False):
     predictedCancerType = artifacts['cancer_type_encoder'][topIndices[0].item()]
     predictedConfidence = topProbs[0].item()
 
-    print(f"  Predicted: {predictedCancerType} ({predictedConfidence:.1%} confidence)")
-    print(f"  Top 3 predictions:")
+    print("Predicted: " + predictedCancerType + " (" + "{:.1%}".format(predictedConfidence) + " confidence)")
+    print("Top 3 predictions:")
     for i in range(3):
         cancerType = artifacts['cancer_type_encoder'][topIndices[i].item()]
         confidence = topProbs[i].item()
-        print(f"    {i+1}. {cancerType:6s} - {confidence:.1%}")
-    print()
+        print(str(i+1) + ". " + cancerType + " - " + "{:.1%}".format(confidence))
 
-    print("[Step 3/4] Translating methylation → gene expression (Model 2)...")
+    print("Translating methylation to gene expression")
     with torch.no_grad():
         predExpression = artifacts['translator_model'](methylationTensor)
         predExpression = predExpression * artifacts['expression_std'] + artifacts['expression_mean']
-
-    print(f"  ✓ Predicted expression for {len(artifacts['gene_overlap'])} genes")
-    print()
-
-    print("[Step 4/4] Predicting drug sensitivity (Model 3)...")
+        
+    print("Predicting Drug Sensativity")
     with torch.no_grad():
         predExpressionNorm = (predExpression - predExpression.mean(dim=1, keepdim=True)) / (predExpression.std(dim=1, keepdim=True) + 1e-6)
         predIc50 = artifacts['predictor_model'](predExpressionNorm)
 
     predIc50 = predIc50.cpu().numpy()[0]
-    print(f"  ✓ Predicted IC50 for {len(artifacts['drug_names'])} drugs")
-    print()
 
-    print("[Filtering] Selecting cancer-relevant drugs...")
     relevantDrugs = artifacts['cancer_type_drug_map'].get(predictedCancerType, [])
 
-    if len(relevantDrugs) == 0:
-        print(f"  ⚠ No specific drugs found for {predictedCancerType}")
-        print(f"  Using all {len(artifacts['drug_names'])} drugs")
-        relevantDrugs = artifacts['drug_names']
-    else:
-        print(f"  ✓ Found {len(relevantDrugs)} drugs tested on {predictedCancerType} cell lines")
-    print()
+    #if len(relevantDrugs) == 0:
+    #    print("  No specific drugs found for " + predictedCancerType)
+    #    print("  Using all " + str(len(artifacts['drug_names'])) + " drugs")
+    #    relevantDrugs = artifacts['drug_names']
+    #else:
+    #    print("  Found " + str(len(relevantDrugs)) + " drugs tested on " + predictedCancerType + " cell lines")
+    #print()
 
     drugScores = []
     for i, drugName in enumerate(artifacts['drug_names']):
@@ -221,40 +186,28 @@ def predictFromMethylation(methylationData, artifacts, topK=10, showAll=False):
 
     drugScores.sort(key=lambda x: x['predicted_ic50'])
 
-    print("=" * 80)
-    print("RESULTS")
-    print("=" * 80)
     print()
-    print(f"Predicted Cancer Type: {predictedCancerType}")
-    print(f"Confidence: {predictedConfidence:.1%}")
-    print()
+    print("------ RESULTS ------")
+    print("Predicted Cancer Type: " + predictedCancerType)
+    print("Confidence: " + "{:.1%}".format(predictedConfidence))
 
     if showAll:
         displayCount = len(drugScores)
-        print(f"All {displayCount} Cancer-Relevant Drug Predictions:")
+        print("All " + str(displayCount) + " Cancer-Relevant Drug Predictions:")
     else:
         displayCount = min(topK, len(drugScores))
-        print(f"Top {displayCount} Most Sensitive Drugs:")
-
-    print("(Lower IC50 = Higher Sensitivity = More Effective)")
-    print()
-    print(f"{'Rank':<6} {'Drug Name':<45} {'IC50':<10} {'Reliability'}")
-    print("-" * 80)
+        print("Top " + str(displayCount) + " Most Sensitive Drugs:")
 
     for rank, drug in enumerate(drugScores[:displayCount], 1):
         if drug['reliability'] > 0.5:
-            reliabilityFlag = "★★★ High"
+            reliabilityLevel = "High"
         elif drug['reliability'] > 0.3:
-            reliabilityFlag = "★★☆ Medium"
+            reliabilityLevel = "Medium"
         else:
-            reliabilityFlag = "★☆☆ Low"
+            reliabilityLevel = "Low"
 
-        print(f"{rank:<6} {drug['drug']:<45} {drug['predicted_ic50']:>7.3f}   {reliabilityFlag} ({drug['reliability']:.3f})")
-
-    print()
-    print(f"Total cancer-relevant drugs: {len(drugScores)}")
-    print()
-
+        output = str(rank) + ". " + drug['drug'] + ": IC50=" + "{:.3f}".format(drug['predicted_ic50']) + " Reliability=" + reliabilityLevel + " (" + "{:.3f}".format(drug['reliability']) + ")"
+        print(output)
     return {
         'cancer_type': predictedCancerType,
         'cancer_confidence': predictedConfidence,
@@ -271,6 +224,7 @@ def main():
     parser = argparse.ArgumentParser(
         description='Predict cancer type and drug sensitivity from methylation data',
         formatter_class=argparse.RawDescriptionHelpFormatter,
+
         epilog="""
 Examples:
   # Run on example from test set
@@ -310,26 +264,22 @@ Examples:
     if args.example:
         methylationData, trueLabel = loadExampleSample()
     else:
-        print(f"Loading methylation data from {args.input}...")
         inputPath = Path(args.input)
         if inputPath.suffix == '.tsv':
             methylationData = pd.read_csv(inputPath, sep='\t', index_col=0).iloc[:, 0]
         else:
             methylationData = pd.read_csv(inputPath, index_col=0).iloc[:, 0]
         trueLabel = None
-        print(f"  ✓ Loaded")
-        print()
 
     results = predictFromMethylation(methylationData, artifacts, topK=args.top_k, showAll=args.show_all)
 
     if trueLabel:
-        print("=" * 80)
-        print(f"Ground Truth: {trueLabel}")
+        print()
+        print("Ground Truth: " + trueLabel)
         if results['cancer_type'] == trueLabel:
-            print("✓ Prediction CORRECT!")
+            print("Prediction CORRECT")
         else:
-            print(f"✗ Prediction incorrect (predicted {results['cancer_type']})")
-        print("=" * 80)
+            print("Prediction incorrect (predicted " + results['cancer_type'] + ")")
         print()
 
     if args.output:
@@ -339,7 +289,7 @@ Examples:
 
         with open(args.output, 'w') as f:
             json.dump(outputData, f, indent=2)
-        print(f"Results saved to {args.output}")
+        print("Results saved to " + args.output)
         print()
 
 if __name__ == '__main__':
