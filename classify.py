@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-import sys
 import argparse
-import torch
 import json
-import random
 from pathlib import Path
+import random
+import sys
+
+import torch
 
 sys.path.append(str(Path(__file__).parent / 'classifyModel'))
 
@@ -20,12 +21,12 @@ class CancerClassifierCLI:
     def loadModel(self):
         print("Loading model and preprocessing parameters...")
 
-        with open(config.getArtifactPath('label_encoder'), 'r') as f:
+        with open(config.getArtifactPath('label_encoder'), 'r', encoding = 'utf-8') as f:
             self.labelEncoder = json.load(f)
 
         self.inverseEncoder = {v: k for k, v in self.labelEncoder.items()}
 
-        with open(config.getArtifactPath('probe_names'), 'r') as f:
+        with open(config.getArtifactPath('probe_names'), 'r', encoding = 'utf-8') as f:
             self.probeNames = json.load(f)
 
         inputDim = len(self.probeNames)
@@ -147,14 +148,14 @@ class CancerClassifierCLI:
         print("MODEL STATISTICS")
         print("="*70)
 
-        with open(config.getArtifactPath('preprocess_meta'), 'r') as f:
+        with open(config.getArtifactPath('preprocess_meta'), 'r', encoding = 'utf-8') as f:
             meta = json.load(f)
 
-        print(f"\nDataset Split:")
+        print("\nDataset Split:")
         print(f"  Train:    {meta['num_samples']['train']:,} samples")
         print(f"  Val:      {meta['num_samples']['val']:,} samples")
         print(f"  Test:     {meta['num_samples']['test']:,} samples")
-        print(f"\nModel Configuration:")
+        print("\nModel Configuration:")
         print(f"  Features: {meta['num_features']:,} probes")
         print(f"  Classes:  {meta['num_classes']} cancer types")
         print(f"  Hidden:   {config.HIDDEN_DIMS}")
