@@ -10,8 +10,6 @@ from utils import getDevice, logitTransform
 from model import CancerClassifier
 
 def loadArtifacts():
-    print("Loading trained model and preprocessing parameters...")
-
     with open(config.getArtifactPath('label_encoder'), 'r') as f:
         labelEncoder = json.load(f)
 
@@ -30,13 +28,9 @@ def loadArtifacts():
     device = getDevice()
     model = CancerClassifier(inputDim, numClasses).to(device)
 
-    checkpoint = torch.load(config.getArtifactPath('best_model'), map_location=device)
+    checkpoint = torch.load(config.getArtifactPath('best_model'), map_location=device, weights_only=False)
     model.load_state_dict(checkpoint['model_state_dict'])
     model.eval()
-
-    print(f"  Loaded model from epoch {checkpoint['epoch']}")
-    print(f"  Validation Macro-F1: {checkpoint['val_f1']:.4f}")
-    print(f"  Using device: {device}")
 
     return model, probeNames, imputeMedians, featureMean, featureStd, inverseEncoder, device
 
@@ -44,9 +38,9 @@ def preprocessSample(sampleData, probeNames, imputeMedians, featureMean, feature
     if isinstance(sampleData, str):
         samplePath = Path(sampleData)
         if samplePath.suffix == '.tsv':
-            sample = pd.read_csv(samplePath, sep='\t', index_col=0).iloc[0]
+            sample = pd.read_csv(samplePath, sep='\t', index_col=0).iloc[:, 0]
         else:
-            sample = pd.read_csv(samplePath, index_col=0).iloc[0]
+            sample = pd.read_csv(samplePath, index_col=0).iloc[:, 0]
     else:
         sample = sampleData
 

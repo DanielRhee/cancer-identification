@@ -317,6 +317,8 @@ def prepareModel3Data(geneOverlap):
 
     gdscExpression = gdscExpression.T
 
+    gdscExpression = gdscExpression[~gdscExpression.index.duplicated(keep='first')]
+
     print(f"  GDSC expression: {gdscExpression.shape[0]} cell lines x {gdscExpression.shape[1]} genes")
 
     doseResponse = doseResponse[doseResponse['COSMIC_ID'].isin(gdscExpression.index)]
@@ -357,13 +359,25 @@ def prepareModel3Data(geneOverlap):
 
     print(f"  Split: Train={len(trainLines)} | Val={len(valLines)} | Test={len(testLines)}")
 
-    trainIc50 = ic50Matrix.loc[trainLines].values.copy()
-    valIc50 = ic50Matrix.loc[valLines].values.copy()
-    testIc50 = ic50Matrix.loc[testLines].values.copy()
+    availableGenes = [g for g in geneOverlap if g in gdscExpression.columns]
+    gdscExpressionFiltered = gdscExpression[availableGenes]
 
-    trainMask = mask.loc[trainLines].values
-    valMask = mask.loc[valLines].values
-    testMask = mask.loc[testLines].values
+    trainLinesInBoth = [line for line in trainLines if line in gdscExpressionFiltered.index]
+    valLinesInBoth = [line for line in valLines if line in gdscExpressionFiltered.index]
+    testLinesInBoth = [line for line in testLines if line in gdscExpressionFiltered.index]
+
+    print(f"  Filtered to cell lines with both IC50 and expression data:")
+    print(f"    Train: {len(trainLinesInBoth)}/{len(trainLines)}")
+    print(f"    Val: {len(valLinesInBoth)}/{len(valLines)}")
+    print(f"    Test: {len(testLinesInBoth)}/{len(testLines)}")
+
+    trainIc50 = ic50Matrix.loc[trainLinesInBoth].values.copy()
+    valIc50 = ic50Matrix.loc[valLinesInBoth].values.copy()
+    testIc50 = ic50Matrix.loc[testLinesInBoth].values.copy()
+
+    trainMask = mask.loc[trainLinesInBoth].values
+    valMask = mask.loc[valLinesInBoth].values
+    testMask = mask.loc[testLinesInBoth].values
 
     drugMedians = np.nanmedian(trainIc50, axis=0)
 
@@ -380,12 +394,9 @@ def prepareModel3Data(geneOverlap):
     valIc50 = (valIc50 - ic50Mean) / ic50Std
     testIc50 = (testIc50 - ic50Mean) / ic50Std
 
-    availableGenes = [g for g in geneOverlap if g in gdscExpression.columns]
-    gdscExpressionFiltered = gdscExpression[availableGenes]
-
-    trainExpr = gdscExpressionFiltered.loc[trainLines].values
-    valExpr = gdscExpressionFiltered.loc[valLines].values
-    testExpr = gdscExpressionFiltered.loc[testLines].values
+    trainExpr = gdscExpressionFiltered.loc[trainLinesInBoth].values
+    valExpr = gdscExpressionFiltered.loc[valLinesInBoth].values
+    testExpr = gdscExpressionFiltered.loc[testLinesInBoth].values
 
     exprMean = trainExpr.mean(axis=0)
     exprStd = trainExpr.std(axis=0)
